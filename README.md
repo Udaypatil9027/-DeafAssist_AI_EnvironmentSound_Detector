@@ -43,3 +43,111 @@
 - Dog Bark
 
 ## 🏗️ System Architecture
+
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Microphone │────▶│ Audio Backend │────▶│ TensorFlow │
+│ Input │ │ (Python) │ │ Model │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+│ │
+▼ ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ Streamlit │◀────│ Socket │◀────│ Sound │
+│ Frontend │ │ Server │ │ Classification│
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+│
+▼
+┌─────────────────┐
+│ Visual │
+│ Display │
+└─────────────────┘
+
+
+## 📦 Prerequisites
+
+### System Requirements
+- **OS**: Windows 10/11, Linux, or macOS
+- **RAM**: Minimum 4GB (8GB recommended)
+- **CPU**: Dual-core or better
+- **Microphone**: Built-in or external
+- **Python**: 3.8 or higher
+
+### Required Libraries
+
+tensorflow==2.13.0
+librosa==0.10.0
+sounddevice==0.4.6
+streamlit==1.28.0
+numpy==1.24.3
+scipy==1.11.1
+plotly==5.15.0
+pandas==2.0.3
+opencv-python==4.8.0
+matplotlib==3.7.2
+
+
+## 🚀 Installation Guide
+
+Step 1: Clone or Download the Project
+
+```bash
+# Navigate to your desired directory
+cd C:\Users\YourUsername\Documents
+
+# Create project folder
+mkdir DeafAssist_AI
+cd DeafAssist_AI
+
+
+Step 2: Set Up Virtual Environment (Recommended)
+
+python -m venv venv
+venv\Scripts\activate
+
+Step 3: Install Dependencies
+
+pip install tensorflow librosa sounddevice streamlit numpy scipy plotly pandas opencv-python matplotlib
+
+Step 4: Place Your Model File
+Ensure your trained model file environmental_noise_cnn.h5 is in the project root directory.
+
+Step 5: Verify Installation
+
+python -c "import tensorflow; print('TensorFlow:', tensorflow.__version__)"
+python -c "import streamlit; print('Streamlit:', streamlit.__version__)"
+
+🎮 Running the Application
+Method 1: Manual Run (Two Terminals)
+Terminal 1 - Start Backend Server:
+
+cd C:\Users\Asus\OneDrive\Documents\Sound_Detector
+python audio_backend_accurate.py
+
+
+Terminal 2 - Start Frontend:
+
+cd C:\Users\Asus\OneDrive\Documents\Sound_Detector
+streamlit run streamlit_frontend_pro.py
+
+User Interface Overview
+┌─────────────────────────────────────────────────────────────┐
+│  🎧 DeafAssist AI                    ● CONNECTED           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  🎯 Sound Detected                                   │   │
+│  │                                                     │   │
+│  │              DOG BARK                               │   │
+│  │  ████████████████████████████████ 84.2%            │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │
+│  │Current   │ │Confidence│ │Total     │ │Status    │      │
+│  │Dog Bark  │ │84.2%     │ │47        │ │Active    │      │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘      │
+│                                                             │
+│  ┌─────────────────────┐  ┌─────────────────────────┐    │
+│  │    Confidence       │  │   Top Predictions       │    │
+│  │      Gauge          │  │   ■ Dog Bark 84.2%      │    │
+│  │                     │  │   ■ Car Horn 11.1%      │    │
+│  └─────────────────────┘  └─────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
