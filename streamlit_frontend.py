@@ -8,7 +8,6 @@ import pandas as pd
 from collections import deque
 from datetime import datetime
 import base64
-from streamlit.components.v1 import html
 
 # =====================================================================
 # PAGE CONFIGURATION
@@ -295,6 +294,17 @@ st.markdown("""
         font-size: 0.8rem;
         margin-top: 2rem;
     }
+    
+    /* Model Info Badge */
+    .model-badge {
+        background: rgba(102,126,234,0.2);
+        border: 1px solid rgba(102,126,234,0.3);
+        border-radius: 10px;
+        padding: 0.3rem 0.8rem;
+        font-size: 0.7rem;
+        color: #a8b5ff;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -439,36 +449,39 @@ def create_top_predictions_chart(predictions, selected_hazards, top_n=8):
 # =====================================================================
 def main():
     # Header Section
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        st.markdown("""
-        <div class="header-container">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <div class="logo-icon">
-                        🎧
-                    </div>
-                    <div class="title-section">
-                        <h1>DeafAssist AI</h1>
-                        <p>Professional Environmental Sound Detection System</p>
-                    </div>
+    st.markdown(f"""
+    <div class="header-container">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="logo-icon">
+                    🎧
                 </div>
-                <div>
-                    <div class="status-badge {}">
-                        {}
-                    </div>
+                <div class="title-section">
+                    <h1>DeafAssist AI</h1>
+                    <p>Professional Environmental Sound Detection System</p>
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div class="status-badge {'status-connected' if st.session_state.connected else 'status-disconnected'}">
+                    {'● CONNECTED' if st.session_state.connected else '○ DISCONNECTED'}
+                </div>
+                <div class="model-badge" style="margin-top: 0.5rem;">
+                    📁 Model: audio_classification.keras
                 </div>
             </div>
         </div>
-        """.format(
-            "status-connected" if st.session_state.connected else "status-disconnected",
-            "● CONNECTED" if st.session_state.connected else "○ DISCONNECTED"
-        ), unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
         st.markdown("### 🎮 Control Center")
+        st.markdown("---")
+        
+        # Model Info
+        st.markdown("#### 🤖 Model Information")
+        st.info("📁 **Model**: audio_classification.keras\n\n🎯 **Classes**: 10 Urban Sounds\n\n⚡ **Format**: Keras (.keras)")
+        
         st.markdown("---")
         
         # Connection
@@ -480,7 +493,7 @@ def main():
                     st.session_state.connected = True
                     st.rerun()
                 else:
-                    st.error("❌ Backend not running")
+                    st.error("❌ Backend not running. Start with: python audio_backend_accurate.py")
         
         st.markdown("---")
         
@@ -705,6 +718,10 @@ def main():
                         </p>
                     </div>
                     
+                    <div style="background: rgba(102,126,234,0.1); border-radius: 12px; padding: 1rem; margin-top: 1rem;">
+                        <p style="color: #a8b5ff; margin: 0;">📁 Using model: <strong>audio_classification.keras</strong></p>
+                    </div>
+                    
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem;">
                         <div>
                             <div style="font-size: 2rem;">🎯</div>
@@ -730,7 +747,7 @@ def main():
     st.markdown("""
     <div class="footer">
         <p>DeafAssist AI — Professional Sound Detection System | Powered by Deep Learning</p>
-        <p style="font-size: 0.7rem;">© 2024 | Real-time Environmental Sound Classification</p>
+        <p style="font-size: 0.7rem;">Model: audio_classification.keras | © 2024 | Real-time Environmental Sound Classification</p>
     </div>
     """, unsafe_allow_html=True)
 
