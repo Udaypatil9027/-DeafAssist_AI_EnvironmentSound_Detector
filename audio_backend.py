@@ -15,7 +15,7 @@ from scipy import signal
 # =====================================================================
 # CONFIGURATION
 # =====================================================================
-MODEL_PATH = 'environmental_noise_cnn.h5'
+MODEL_PATH = 'audio_classification.keras'
 SAMPLE_RATE = 22050
 DURATION = 2
 WINDOW_SIZE = int(SAMPLE_RATE * DURATION)
@@ -30,56 +30,74 @@ HOST = '127.0.0.1'
 PORT = 9999
 
 print("="*50)
-print("DeafAssist AI - High Accuracy Backend")
+print("DeafAssist AI - Backend")
 print("="*50)
 
 # =====================================================================
-# YOUR ORIGINAL WORKING PREPROCESSING (KEEPING EXACTLY AS IS)
+# FIXED PREPROCESSING FOR 1D MODEL
 # =====================================================================
-def preprocess_audio_original(audio_buffer, max_pad_len=174):
+def preprocess_for_1d_model(audio_buffer):
     """
-    YOUR ORIGINAL WORKING PREPROCESSING - DO NOT CHANGE!
-    This gave you 84% confidence for Dog Bark
+    Preprocess audio for 1D model that expects shape (None, 40)
+    Your model expects flat 40-dimensional features
     """
     audio_mono = np.squeeze(audio_buffer)
     
-    # Generate Mel-Spectrogram (YOUR ORIGINAL METHOD)
-    spectrogram = librosa.feature.melspectrogram(y=audio_mono, sr=SAMPLE_RATE, n_mels=40)
+    # Normalize
+    if np.max(np.abs(audio_mono)) > 0:
+        audio_mono = audio_mono / np.max(np.abs(audio_mono))
+    
+    # Extract MFCC features (40 coefficients)
+    mfccs = librosa.feature.mfcc(
+        y=audio_mono, 
+        sr=SAMPLE_RATE, 
+        n_mfcc=40,
+        n_fft=2048,
+        hop_length=512
+    )
+    
+    # Take mean across time axis to get 40 features
+    mfccs_mean = np.mean(mfccs, axis=1)
+    
+    # Reshape to (1, 40) for model
+    return mfccs_mean.reshape(1, 40)
+
+def preprocess_audio_alternative(audio_buffer):
+    """
+    Alternative: Use Mel-spectrogram and flatten
+    """
+    audio_mono = np.squeeze(audio_buffer)
+    
+    # Normalize
+    if np.max(np.abs(audio_mono)) > 0:
+        audio_mono = audio_mono / np.max(np.abs(audio_mono))
+    
+    # Generate Mel-Spectrogram
+    spectrogram = librosa.feature.melspectrogram(
+        y=audio_mono, 
+        sr=SAMPLE_RATE, 
+        n_mels=40,
+        n_fft=2048,
+        hop_length=512
+    )
     spectrogram_db = librosa.power_to_db(spectrogram, ref=np.max)
     
-    # Pad or crop to exact dimensions
-    if spectrogram_db.shape[1] < max_pad_len:
-        pad_width = max_pad_len - spectrogram_db.shape[1]
-        spectrogram_db = np.pad(spectrogram_db, pad_width=((0, 0), (0, pad_width)), mode='constant')
-    else:
-        spectrogram_db = spectrogram_db[:, :max_pad_len]
-        
-    return spectrogram_db.reshape(1, 40, max_pad_len, 1)
+    # Take mean across time axis to get 40 features
+    features = np.mean(spectrogram_db, axis=1)
+    
+    return features.reshape(1, 40)
 
 # =====================================================================
-# ENHANCED AUDIO PREPROCESSING (WITHOUT CHANGING CORE LOGIC)
+# AUDIO PROCESSOR
 # =====================================================================
-class AccuratePreprocessor:
-    def __init__(self):
-        # Using YOUR original preprocessing
-        self.preprocess_func = preprocess_audio_original
-        
-    def preprocess(self, audio_buffer):
-        """Uses your original working preprocessing"""
-        return self.preprocess_func(audio_buffer)
-
-# =====================================================================
-# HIGH-ACCURACY AUDIO PROCESSOR
-# =====================================================================
-class AccurateAudioProcessor:
+class AudioProcessor:
     def __init__(self):
         self.model = None
-        self.preprocessor = AccuratePreprocessor()
         self.audio_queue = queue.Queue(maxsize=30)
         self.audio_buffer = np.zeros((WINDOW_SIZE, 1), dtype=np.float32)
         
-        # Larger smoothing window for stability (like your original)
-        self.prediction_history = deque(maxlen=8)
+        # Smoothing window
+        self.prediction_history = deque(maxlen=5)
         
         # Current state
         self.current_prediction = "None"
@@ -87,11 +105,8 @@ class AccurateAudioProcessor:
         self.all_predictions = [0.0] * len(CLASSES)
         self.is_running = True
         
-        # For audio enhancement
-        self.noise_floor = 0.01
-        
     def load_model(self):
-        """Load the trained model"""
+        """Load the .keras model"""
         if not os.path.exists(MODEL_PATH):
             print(f"ERROR: Model not found: {MODEL_PATH}")
             return False
@@ -101,34 +116,27 @@ class AccurateAudioProcessor:
             self.model = tf.keras.models.load_model(MODEL_PATH)
             print("✓")
             print(f"Model input shape: {self.model.input_shape}")
+            print(f"Model output shape: {self.model.output_shape}")
+            
+            # Verify model expects 1D input
+            if len(self.model.input_shape) == 2:
+                print("✓ Model expects 1D input (good)")
+            else:
+                print(f"⚠️ Model expects {len(self.model.input_shape)}D input")
+            
             return True
         except Exception as e:
-            print(f"✗ {e}")
+            print(f"✗ Failed: {e}")
             return False
     
-    def enhance_audio(self, audio):
-        """Light enhancement without changing characteristics"""
-        audio = np.squeeze(audio)
-        
-        # Simple DC offset removal
-        audio = audio - np.mean(audio)
-        
-        # Gentle high-pass filter (remove only subsonic rumble)
-        if len(audio) > 100:
-            b, a = signal.butter(2, 20, btype='high', fs=SAMPLE_RATE)
-            audio = signal.filtfilt(b, a, audio)
-        
-        return audio.reshape(-1, 1)
-    
     def audio_callback(self, indata, frames, time, status):
-        """Audio callback"""
         if status:
             return
         if not self.audio_queue.full():
             self.audio_queue.put(indata.copy())
     
     def process_stream(self):
-        """Main processing loop with YOUR original method"""
+        """Main processing loop"""
         try:
             stream = sd.InputStream(
                 samplerate=SAMPLE_RATE,
@@ -138,13 +146,11 @@ class AccurateAudioProcessor:
                 latency='low'
             )
             stream.start()
-            print("🎤 Microphone active - Using HIGH ACCURACY mode")
-            print("✓ Your original preprocessing is being used\n")
+            print("🎤 Microphone active")
+            print("✓ Using 1D model preprocessing\n")
         except Exception as e:
             print(f"Microphone error: {e}")
             return
-        
-        last_print_time = 0
         
         while self.is_running:
             # Process audio chunks
@@ -156,13 +162,13 @@ class AccurateAudioProcessor:
                 self.audio_buffer[-chunk_len:] = chunk
                 chunks_processed += 1
             
-            # YOUR ORIGINAL PREPROCESSING - UNCHANGED
-            input_tensor = self.preprocessor.preprocess(self.audio_buffer)
+            # Preprocess for 1D model
+            input_features = preprocess_for_1d_model(self.audio_buffer)
             
-            # Predict using your model
-            predictions = self.model.predict(input_tensor, verbose=0)[0]
+            # Make prediction
+            predictions = self.model.predict(input_features, verbose=0)[0]
             
-            # Smooth predictions (like your original)
+            # Smooth predictions
             self.prediction_history.append(predictions)
             smoothed = np.mean(self.prediction_history, axis=0)
             
@@ -172,14 +178,11 @@ class AccurateAudioProcessor:
             self.current_prediction = CLASSES[class_id]
             self.all_predictions = smoothed.tolist()
             
-            # Print high confidence detections (like your original)
-            current_time = time.time()
-            if self.current_confidence > 0.5 and current_time - last_print_time > 0.5:
+            # Print high confidence detections
+            if self.current_confidence > 0.5:
                 print(f"\r🎯 {self.current_prediction}: {self.current_confidence*100:.1f}%    ", end="", flush=True)
-                last_print_time = current_time
             
-            # Control loop speed - matching your original timing
-            time.sleep(0.05)  # 50ms like your original
+            time.sleep(0.05)
         
         stream.stop()
         stream.close()
@@ -200,7 +203,7 @@ class SocketServer:
             self.server_socket.listen(1)
             self.server_socket.settimeout(1.0)
             
-            print(f"Server: {HOST}:{PORT}")
+            print(f"Server listening on {HOST}:{PORT}")
             print("\n✓ Ready! Connect with Streamlit app\n")
             
             while True:
@@ -215,7 +218,7 @@ class SocketServer:
                             'all_predictions': self.processor.all_predictions
                         }
                         client_socket.send((json.dumps(data) + '\n').encode())
-                        time.sleep(0.05)  # 20Hz update
+                        time.sleep(0.05)
                         
                 except socket.timeout:
                     continue
@@ -230,10 +233,12 @@ class SocketServer:
 # MAIN
 # =====================================================================
 if __name__ == "__main__":
-    processor = AccurateAudioProcessor()
+    processor = AudioProcessor()
     
     if not processor.load_model():
-        print("Failed to load model. Make sure the model file exists.")
+        print("\n❌ Failed to load model. Please check:")
+        print(f"   1. Model file '{MODEL_PATH}' exists")
+        print(f"   2. File is a valid .keras format")
         sys.exit(1)
     
     # Start audio processing
